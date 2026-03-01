@@ -20,9 +20,9 @@ Features:
   - In overdue list: d to delete a task
 
 Navigation:
-  ↑↓←→    navigate between dates
-  n/p     next / previous month (or l/h)
-  t       jump to today
+  ↑/↓     move between dates (or j/k)
+  n/p     next / previous month (or ←/→)
+  t       jump to current month
   s       switch to overdue list / back to calendar
   q       quit`,
 
