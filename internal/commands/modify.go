@@ -21,7 +21,7 @@ func newModifyCmd(d *deps) *cobra.Command {
 Without arguments:
   Opens the full-screen task list. Navigate to the task you want and press Enter.
   The add wizard opens, pre-populated with the task's current values.
-  Modify any field (or leave it unchanged) and confirm.
+  Modify any field (or leave it unchanged) and confirm. Press d to delete a task.
 
 With an argument (ID or UUID):
   Skips the list picker and opens the edit form immediately for that task.
@@ -65,7 +65,7 @@ func runModify(ctx context.Context, d *deps, args []string) error {
 			return nil
 		}
 
-		result, err := tasklist.Run(tasks, tasklist.ModeModify)
+		result, err := tasklist.RunWithDelete(ctx, d.tw, taskwarrior.Filter{Status: "pending"}, tasklist.ModeModify)
 		if err != nil {
 			return err
 		}

@@ -28,6 +28,9 @@ type Client interface {
 	// Modify applies updates to the task identified by uuid.
 	Modify(ctx context.Context, uuid string, req AddRequest) error
 
+	// Delete marks the task identified by uuid as deleted.
+	Delete(ctx context.Context, uuid string) error
+
 	// Version returns the Taskwarrior version string.
 	Version(ctx context.Context) (string, error)
 }
@@ -219,6 +222,13 @@ func (c *CLIClient) Modify(ctx context.Context, uuid string, req AddRequest) err
 	}
 	if _, err := c.run(ctx, args...); err != nil {
 		return fmt.Errorf("modify task %s: %w", uuid, err)
+	}
+	return nil
+}
+
+func (c *CLIClient) Delete(ctx context.Context, uuid string) error {
+	if _, err := c.run(ctx, uuid, "delete"); err != nil {
+		return fmt.Errorf("delete task %s: %w", uuid, err)
 	}
 	return nil
 }

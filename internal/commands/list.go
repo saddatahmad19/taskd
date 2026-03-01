@@ -19,6 +19,7 @@ func newListCmd(d *deps) *cobra.Command {
 Navigation:
   ↑/↓ or j/k   scroll
   /             enter filter mode
+  d             delete selected task
   Esc or q      quit (clears filter first if one is active)
 
 Filter syntax (space-separated terms are ANDed):
@@ -85,7 +86,7 @@ func runList(ctx context.Context, d *deps, f taskwarrior.Filter) error {
 		return nil
 	}
 
-	result, err := tasklist.Run(tasks, tasklist.ModeList)
+	result, err := tasklist.RunWithDelete(ctx, d.tw, f, tasklist.ModeList)
 	if err != nil {
 		return err
 	}

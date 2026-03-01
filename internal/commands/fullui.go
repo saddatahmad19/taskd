@@ -11,7 +11,7 @@ import (
 func newFullUICmd(d *deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "full-ui",
-		Short: "Full TUI with tabs for add, list, complete, and modify",
+		Short: "Full TUI with tabs for add, list, complete, modify, and calendar",
 		Long: `Launches a tabbed full-screen TUI combining all taskd features.
 
 Tabs:
@@ -19,10 +19,11 @@ Tabs:
   List     — Browse and filter tasks
   Complete — Mark tasks as done (toggle with Space, confirm with Enter)
   Modify   — Edit tasks (select one, then edit in the form)
+  Calendar — Calendar view of due dates (s for overdue list, d to delete)
 
 Navigation:
   Tab / Shift+Tab    cycle through tabs
-  Alt+1 .. Alt+4     jump to tab (may not work in all terminals)
+  Alt+1 .. Alt+5     jump to tab (may not work in all terminals)
   q / Ctrl+C         quit`,
 
 		RunE: func(cmd *cobra.Command, _ []string) error {

@@ -12,6 +12,7 @@ type MockClient struct {
 	ProjectsFn func(ctx context.Context) ([]string, error)
 	CompleteFn func(ctx context.Context, uuid string) error
 	ModifyFn   func(ctx context.Context, uuid string, req AddRequest) error
+	DeleteFn   func(ctx context.Context, uuid string) error
 	VersionFn  func(ctx context.Context) (string, error)
 }
 
@@ -57,6 +58,13 @@ func (m *MockClient) Modify(ctx context.Context, uuid string, req AddRequest) er
 		return m.ModifyFn(ctx, uuid, req)
 	}
 	return fmt.Errorf("MockClient.Modify not implemented")
+}
+
+func (m *MockClient) Delete(ctx context.Context, uuid string) error {
+	if m.DeleteFn != nil {
+		return m.DeleteFn(ctx, uuid)
+	}
+	return fmt.Errorf("MockClient.Delete not implemented")
 }
 
 func (m *MockClient) Version(ctx context.Context) (string, error) {

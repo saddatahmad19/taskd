@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/saddatahmad19/taskd/internal/taskwarrior"
 	"github.com/saddatahmad19/taskd/internal/ui/add"
+	"github.com/saddatahmad19/taskd/internal/ui/calendar"
 	"github.com/saddatahmad19/taskd/internal/ui/styles"
 	"github.com/saddatahmad19/taskd/internal/ui/tasklist"
 )
@@ -18,10 +19,11 @@ const (
 	tabList
 	tabComplete
 	tabModify
+	tabCalendar
 	tabCount
 )
 
-var tabNames = []string{"Add", "List", "Complete", "Modify"}
+var tabNames = []string{"Add", "List", "Complete", "Modify", "Calendar"}
 
 var (
 	tabStyleActive = lipgloss.NewStyle().
@@ -58,6 +60,9 @@ type Model struct {
 	modifyModel  *tasklist.Model
 	modifyEditing *taskwarrior.Task
 	modifyForm   *add.FormModel
+
+	// Calendar tab
+	calendarModel *calendar.Model
 
 	// Status message
 	statusMsg string
@@ -122,6 +127,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMsg = ""
 			m.resizeActiveView()
 			return m, m.ensureActiveViewInit()
+		case "alt+5":
+			m.active = 4
+			m.statusMsg = ""
+			m.resizeActiveView()
+			return m, m.ensureActiveViewInit()
 		}
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -133,6 +143,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleFormCancel()
 	case tasklist.ListViewDoneMsg:
 		return m.handleListDone(msg)
+	case tasklist.ListDeleteMsg:
+		return m.handleListDelete(msg)
 	}
 
 	return m.updateActiveView(msg)
@@ -215,6 +227,42 @@ func (m *Model) handleListDone(msg tasklist.ListViewDoneMsg) (tea.Model, tea.Cmd
 	return m, nil
 }
 
+func (m *Model) handleListDelete(msg tasklist.ListDeleteMsg) (tea.Model, tea.Cmd) {
+	if msg.Task == nil {
+		return m, nil
+	}
+	if err := m.tw.Delete(m.ctx, msg.Task.UUID); err != nil {
+		m.statusMsg = fmt.Sprintf("Failed to delete: %v", err)
+		m.statusErr = true
+		return m, nil
+	}
+	m.statusMsg = "Task deleted"
+	m.statusErr = false
+
+	switch m.active {
+	case tabList:
+		m.loadListTasks()
+		m.listModel = m.newListModel()
+		m.resizeActiveView()
+		return m, m.listModel.Init()
+	case tabComplete:
+		m.refreshCompleteTasks()
+		m.completeModel = m.newCompleteModel()
+		m.resizeActiveView()
+		return m, m.completeModel.Init()
+	case tabModify:
+		m.refreshModifyTasks()
+		m.modifyModel = m.newModifyModel()
+		m.resizeActiveView()
+		return m, m.modifyModel.Init()
+	case tabCalendar:
+		m.calendarModel = calendar.New(m.ctx, m.tw)
+		m.resizeActiveView()
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m *Model) ensureActiveViewInit() tea.Cmd {
 	contentH := m.height - 4
 	if contentH < 2 {
@@ -243,6 +291,11 @@ func (m *Model) ensureActiveViewInit() tea.Cmd {
 			m.modifyModel.SetSize(m.width, contentH)
 			return m.modifyModel.Init()
 		}
+	case tabCalendar:
+		if m.calendarModel == nil {
+			m.calendarModel = calendar.New(m.ctx, m.tw)
+			m.resizeActiveView()
+		}
 	}
 	return nil
 }
@@ -267,6 +320,9 @@ func (m *Model) resizeActiveView() {
 	}
 	if m.modifyModel != nil {
 		m.modifyModel.SetSize(m.width, contentH)
+	}
+	if m.calendarModel != nil {
+		m.calendarModel.SetSize(m.width, contentH)
 	}
 }
 
@@ -329,6 +385,13 @@ func (m *Model) updateActiveView(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	}
+	if m.active == tabCalendar && m.calendarModel != nil {
+		result, cmd := m.calendarModel.Update(msg)
+		if cm, ok := result.(*calendar.Model); ok {
+			m.calendarModel = cm
+		}
+		return m, cmd
+	}
 
 	return m, nil
 }
@@ -367,6 +430,9 @@ func (m *Model) newListModel() *tasklist.Model {
 	lm.OnQuit = func(r tasklist.Result) tea.Cmd {
 		return func() tea.Msg { return tasklist.ListViewDoneMsg{Result: r} }
 	}
+	lm.OnDelete = func(t *taskwarrior.Task) tea.Cmd {
+		return func() tea.Msg { return tasklist.ListDeleteMsg{Task: t} }
+	}
 	return &lm
 }
 
@@ -375,6 +441,9 @@ func (m *Model) newCompleteModel() *tasklist.Model {
 	lm.OnQuit = func(r tasklist.Result) tea.Cmd {
 		return func() tea.Msg { return tasklist.ListViewDoneMsg{Result: r} }
 	}
+	lm.OnDelete = func(t *taskwarrior.Task) tea.Cmd {
+		return func() tea.Msg { return tasklist.ListDeleteMsg{Task: t} }
+	}
 	return &lm
 }
 
@@ -382,6 +451,9 @@ func (m *Model) newModifyModel() *tasklist.Model {
 	lm := tasklist.New(m.modifyTasks, tasklist.ModeModify)
 	lm.OnQuit = func(r tasklist.Result) tea.Cmd {
 		return func() tea.Msg { return tasklist.ListViewDoneMsg{Result: r} }
+	}
+	lm.OnDelete = func(t *taskwarrior.Task) tea.Cmd {
+		return func() tea.Msg { return tasklist.ListDeleteMsg{Task: t} }
 	}
 	return &lm
 }
@@ -434,6 +506,12 @@ func (m *Model) View() string {
 		} else {
 			content = contentStyle.Render(styles.MutedText.Render("  Loading…"))
 		}
+	case tabCalendar:
+		if m.calendarModel != nil {
+			content = contentStyle.Render(m.calendarModel.View())
+		} else {
+			content = contentStyle.Render(styles.MutedText.Render("  Loading…"))
+		}
 	}
 
 	// Status line
@@ -445,7 +523,7 @@ func (m *Model) View() string {
 			statusLine = styles.Success.Render("  "+m.statusMsg) + "\n"
 		}
 	}
-	statusLine += styles.MutedText.Render("  Tab/Shift+Tab: switch tab  ·  Alt+1-4: jump to tab  ·  q: quit")
+	statusLine += styles.MutedText.Render("  Tab/Shift+Tab: switch tab  ·  Alt+1-5: jump to tab  ·  q: quit")
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		tabBar,

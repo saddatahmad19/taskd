@@ -73,6 +73,7 @@ func Execute() {
 		newListCmd(d),
 		newCompleteCmd(d),
 		newModifyCmd(d),
+		newCalendarCmd(d),
 		newFullUICmd(d),
 		newVersionCmd(d),
 	)

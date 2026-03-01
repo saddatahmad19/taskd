@@ -1,6 +1,7 @@
 package tasklist
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -21,6 +22,8 @@ const (
 	ModeComplete
 	// ModeModify lets the user pick a task to edit (Enter to select).
 	ModeModify
+	// ModePastDue is like ModeList but for overdue tasks (different title, supports delete).
+	ModePastDue
 )
 
 type Result struct {
@@ -36,6 +39,12 @@ type Result struct {
 // The parent receives this and can process the result without quitting.
 type ListViewDoneMsg struct {
 	Result Result
+}
+
+// ListDeleteMsg is sent when the user presses d to delete the selected task.
+// The parent should call tw.Delete and refresh the list.
+type ListDeleteMsg struct {
+	Task *taskwarrior.Task
 }
 
 var (
@@ -63,6 +72,10 @@ var (
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "edit task"),
 	)
+	keyDelete = key.NewBinding(
+		key.WithKeys("d"),
+		key.WithHelp("d", "delete"),
+	)
 )
 
 
@@ -79,6 +92,10 @@ type Model struct {
 	// OnQuit, when non-nil, is called instead of tea.Quit when the list exits.
 	// Used when embedding the list in a parent (e.g. full-ui).
 	OnQuit func(Result) tea.Cmd
+
+	// OnDelete, when non-nil, is called when the user presses d to delete the selected task.
+	// Used when the parent can perform the delete (e.g. full-ui, calendar, or standalone with wrapper).
+	OnDelete func(*taskwarrior.Task) tea.Cmd
 }
 
 func New(tasks []taskwarrior.Task, mode Mode) Model {
@@ -221,6 +238,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleAll()
 			return m, nil
 
+		// ── Delete selected task (when OnDelete is set) ────────────────────────
+		case key.Matches(msg, keyDelete):
+			if m.OnDelete != nil {
+				if it, ok := m.list.SelectedItem().(Item); ok {
+					t := it.Task
+					return m, m.OnDelete(&t)
+				}
+			}
+			return m, nil
+
 		// ── Enter: mode-specific action ───────────────────────────────────────
 		case msg.String() == "enter":
 			return m.handleEnter()
@@ -317,8 +344,10 @@ func (m Model) renderHint() string {
 		}
 	case ModeModify:
 		line = styles.MutedText.Render("  enter: open edit form  /: filter")
+	case ModePastDue:
+		line = styles.MutedText.Render("  d: delete  /: filter")
 	default:
-		line = styles.MutedText.Render("  /: filter")
+		line = styles.MutedText.Render("  d: delete  /: filter")
 	}
 
 	// Append filter indicator if a filter is active.
@@ -352,6 +381,98 @@ func Run(tasks []taskwarrior.Task, mode Mode) (Result, error) {
 	return fm.GetResult(), nil
 }
 
+// runWithDeleteModel wraps the tasklist to support delete (d key) in standalone mode.
+type runWithDeleteModel struct {
+	list    Model
+	tw      taskwarrior.Client
+	ctx     context.Context
+	filter  taskwarrior.Filter
+	mode    Mode
+	loadErr error
+}
+
+func (m *runWithDeleteModel) Init() tea.Cmd {
+	return m.list.Init()
+}
+
+func (m *runWithDeleteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case ListDeleteMsg:
+		if msg.Task == nil {
+			return m, nil
+		}
+		if err := m.tw.Delete(m.ctx, msg.Task.UUID); err != nil {
+			m.loadErr = err
+			return m, nil
+		}
+		tasks, err := m.tw.Export(m.ctx, m.filter)
+		if err != nil {
+			m.loadErr = err
+			return m, nil
+		}
+		if len(tasks) == 0 {
+			return m, tea.Quit
+		}
+		m.list = *newModelWithDelete(tasks, m.mode, m.ctx, m.tw)
+		return m, m.list.Init()
+	case ListViewDoneMsg:
+		return m, tea.Quit
+	}
+
+	var cmd tea.Cmd
+	result, cmd := m.list.Update(msg)
+	if lm, ok := result.(Model); ok {
+		m.list = lm
+	}
+	return m, cmd
+}
+
+func (m *runWithDeleteModel) View() string {
+	return m.list.View()
+}
+
+func newModelWithDelete(tasks []taskwarrior.Task, mode Mode, ctx context.Context, tw taskwarrior.Client) *Model {
+	lm := New(tasks, mode)
+	lm.OnQuit = func(r Result) tea.Cmd {
+		return func() tea.Msg { return ListViewDoneMsg{Result: r} }
+	}
+	lm.OnDelete = func(t *taskwarrior.Task) tea.Cmd {
+		return func() tea.Msg { return ListDeleteMsg{Task: t} }
+	}
+	return &lm
+}
+
+// RunWithDelete runs the tasklist with delete support. Use for standalone list/complete/modify commands.
+func RunWithDelete(ctx context.Context, tw taskwarrior.Client, f taskwarrior.Filter, mode Mode) (Result, error) {
+	tasks, err := tw.Export(ctx, f)
+	if err != nil {
+		return Result{Aborted: true}, fmt.Errorf("fetch tasks: %w", err)
+	}
+	if len(tasks) == 0 {
+		return Result{Aborted: true}, nil
+	}
+	m := &runWithDeleteModel{
+		list:   *newModelWithDelete(tasks, mode, ctx, tw),
+		tw:     tw,
+		ctx:    ctx,
+		filter: f,
+		mode:   mode,
+	}
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	final, err := p.Run()
+	if err != nil {
+		return Result{Aborted: true}, fmt.Errorf("tasklist TUI: %w", err)
+	}
+	wrapper, ok := final.(*runWithDeleteModel)
+	if !ok {
+		return Result{Aborted: true}, fmt.Errorf("tasklist: unexpected model type")
+	}
+	if wrapper.loadErr != nil {
+		return Result{Aborted: true}, wrapper.loadErr
+	}
+	return wrapper.list.GetResult(), nil
+}
+
 
 func modeTitle(mode Mode) string {
 	switch mode {
@@ -359,6 +480,8 @@ func modeTitle(mode Mode) string {
 		return "✦  Complete Tasks"
 	case ModeModify:
 		return "✦  Modify Task — choose one"
+	case ModePastDue:
+		return "✦  Overdue Tasks"
 	default:
 		return "✦  Tasks"
 	}
@@ -367,21 +490,25 @@ func modeTitle(mode Mode) string {
 func shortHelpKeys(mode Mode) []key.Binding {
 	switch mode {
 	case ModeComplete:
-		return []key.Binding{keyToggleSelect, keySelectAll, keyConfirm, keyQuit}
+		return []key.Binding{keyToggleSelect, keySelectAll, keyConfirm, keyDelete, keyQuit}
 	case ModeModify:
-		return []key.Binding{keyEdit, keyQuit}
+		return []key.Binding{keyEdit, keyDelete, keyQuit}
+	case ModePastDue:
+		return []key.Binding{keyDelete, keyQuit}
 	default:
-		return []key.Binding{keyQuit}
+		return []key.Binding{keyDelete, keyQuit}
 	}
 }
 
 func fullHelpKeys(mode Mode) []key.Binding {
-	base := []key.Binding{keyQuit, keyForceQuit}
+	base := []key.Binding{keyDelete, keyQuit, keyForceQuit}
 	switch mode {
 	case ModeComplete:
 		return append([]key.Binding{keyToggleSelect, keySelectAll, keyConfirm}, base...)
 	case ModeModify:
 		return append([]key.Binding{keyEdit}, base...)
+	case ModePastDue:
+		return base
 	default:
 		return base
 	}

@@ -26,7 +26,7 @@ With arguments (IDs or UUIDs):
 
 Navigation in TUI:
   ↑/↓  scroll      Space  toggle      a  select all
-  /    filter       Enter  confirm     q  quit`,
+  /    filter       Enter  confirm     d  delete     q  quit`,
 
 		Example: `  taskd complete           # interactive picker
   taskd complete 3          # mark task 3 done directly
@@ -57,7 +57,7 @@ func runComplete(ctx context.Context, d *deps, args []string) error {
 		return nil
 	}
 
-	result, err := tasklist.Run(tasks, tasklist.ModeComplete)
+	result, err := tasklist.RunWithDelete(ctx, d.tw, taskwarrior.Filter{Status: "pending"}, tasklist.ModeComplete)
 	if err != nil {
 		return err
 	}
