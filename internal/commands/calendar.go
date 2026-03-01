@@ -20,10 +20,9 @@ Features:
   - In overdue list: d to delete a task
 
 Navigation:
-  ↑/↓     move between dates (or j/k)
-  n/p     next / previous month (or ←/→)
-  t       jump to current month
   s       switch to overdue list / back to calendar
+  ←/→     change month (or h/l)
+  t       jump to current month
   q       quit`,
 
 		RunE: func(cmd *cobra.Command, _ []string) error {
