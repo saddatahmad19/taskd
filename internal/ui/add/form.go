@@ -249,6 +249,12 @@ func RunWizardWithDefaults(ctx context.Context, tw taskwarrior.Client, def Defau
 		),
 	).WithTheme(taskdTheme())
 
+	// SubmitCmd and CancelCmd are only wired up inside huh's own Run(); since
+	// we embed the form in our own tea.Program we must set them manually so the
+	// program actually quits when the form completes or is aborted.
+	form.SubmitCmd = tea.Quit
+	form.CancelCmd = tea.Quit
+
 	title := "✦  Add Task"
 	if def.Description != "" {
 		title = "✦  Edit Task"

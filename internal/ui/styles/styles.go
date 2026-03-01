@@ -11,6 +11,7 @@ var (
 	Muted   = lipgloss.Color("#6B7280")
 	Surface = lipgloss.Color("#1F2937")
 	Text    = lipgloss.Color("#F9FAFB")
+	NeonRed = lipgloss.Color("#FF0000")
 )
 
 var App = lipgloss.NewStyle().
