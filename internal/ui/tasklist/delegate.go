@@ -50,18 +50,8 @@ func (d *taskDelegate) Render(w io.Writer, m list.Model, index int, listItem lis
 	// ── Priority accent bar (left edge) ────────────────────────────────────────
 	bar := priorityBarStyle(task.Priority).Render("▌")
 
-	// ── Checkbox (complete mode only) ──────────────────────────────────────────
-	checkStr := ""
-	if d.mode == ModeComplete {
-		if d.selected[task.UUID] {
-			checkStr = styles.Success.Render("✓ ")
-		} else {
-			checkStr = styles.MutedText.Render("○ ")
-		}
-	}
-
 	// ── Description ────────────────────────────────────────────────────────────
-	availableWidth := m.Width() - 6 // bar(1) + space(1) + check(2) + padding(2)
+	availableWidth := m.Width() - 4 // bar(1) + space(1) + padding(2)
 	if availableWidth < 10 {
 		availableWidth = 10
 	}
@@ -79,7 +69,7 @@ func (d *taskDelegate) Render(w io.Writer, m list.Model, index int, listItem lis
 	}
 	descRendered := descStyle.Render(descText)
 
-	titleLine := bar + " " + checkStr + descRendered
+	titleLine := bar + " " + descRendered
 
 	// ── Subtitle / metadata line ───────────────────────────────────────────────
 	var meta []string
@@ -108,7 +98,15 @@ func (d *taskDelegate) Render(w io.Writer, m list.Model, index int, listItem lis
 		meta = append(meta, dueBadge(due))
 	}
 
-	subtitleLine := "  " + strings.Join(meta, "  ")
+	// In ModeComplete, show a bright green bar on the subtitle line when selected.
+	var subtitlePrefix string
+	if d.mode == ModeComplete && d.selected[task.UUID] {
+		subtitlePrefix = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ADE80")).Render("▌") + " "
+	} else {
+		subtitlePrefix = "  "
+	}
+
+	subtitleLine := subtitlePrefix + strings.Join(meta, "  ")
 
 	// ── Selected-item background highlight ─────────────────────────────────────
 	row := lipgloss.JoinVertical(lipgloss.Left, titleLine, subtitleLine)

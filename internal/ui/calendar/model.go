@@ -385,7 +385,7 @@ func (m *Model) renderCalendar() string {
 	selectedStyle := lipgloss.NewStyle().Width(cellWidth).Height(cellHeight).Align(lipgloss.Center).
 		Background(styles.Violet).Foreground(styles.Text)
 	todayStyle := lipgloss.NewStyle().Width(cellWidth).Height(cellHeight).Align(lipgloss.Center).
-		Border(lipgloss.RoundedBorder()).BorderForeground(styles.Mint)
+		Background(styles.Mint).Foreground(styles.Surface)
 	hasTasksStyle := lipgloss.NewStyle().Width(cellWidth).Height(cellHeight).Align(lipgloss.Center).
 		Foreground(styles.Mint).Bold(true)
 
