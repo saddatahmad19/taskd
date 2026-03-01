@@ -99,6 +99,11 @@ type Model struct {
 }
 
 func New(tasks []taskwarrior.Task, mode Mode) Model {
+	return NewWithTitle(tasks, mode, "")
+}
+
+// NewWithTitle creates a tasklist with a custom title (empty = use mode default).
+func NewWithTitle(tasks []taskwarrior.Task, mode Mode, title string) Model {
 	delegate := newTaskDelegate(mode)
 
 	items := make([]list.Item, len(tasks))
@@ -107,7 +112,11 @@ func New(tasks []taskwarrior.Task, mode Mode) Model {
 	}
 
 	l := list.New(items, delegate, 0, 0)
-	l.Title = modeTitle(mode)
+	if title != "" {
+		l.Title = title
+	} else {
+		l.Title = modeTitle(mode)
+	}
 	l.SetFilteringEnabled(true)
 	l.Filter = taskFilter
 	l.SetShowStatusBar(true)
