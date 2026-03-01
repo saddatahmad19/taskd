@@ -6,10 +6,10 @@ A production-quality Taskwarrior companion CLI built with Go and the [Charm](htt
 
 ## Requirements
 
-| Dependency                                       | Version |
-| ------------------------------------------------ | ------- |
-| Go                                               | ≥ 1.21  |
-| [Taskwarrior](https://taskwarrior.org/download/) | ≥ 2.6   |
+| Dependency                                       | Version | Required for        |
+| ------------------------------------------------ | ------- | ------------------- |
+| [Taskwarrior](https://taskwarrior.org/download/) | ≥ 2.6   | all users           |
+| Go                                               | ≥ 1.21  | building from source |
 
 Taskwarrior must be installed and `task` must be available in your `$PATH`.
 
@@ -17,7 +17,29 @@ Taskwarrior must be installed and `task` must be available in your `$PATH`.
 
 ## Installation
 
-### From source (recommended)
+### From a release binary (recommended)
+
+Download a prebuilt binary from the [latest release](https://github.com/saddatahmad19/taskd/releases/latest) — no Go installation required.
+
+**Linux (amd64):**
+```bash
+curl -sSL https://github.com/saddatahmad19/taskd/releases/latest/download/taskd_linux_amd64.tar.gz | tar xz
+sudo mv taskd /usr/local/bin/
+```
+
+**macOS (Apple Silicon):**
+```bash
+curl -sSL https://github.com/saddatahmad19/taskd/releases/latest/download/taskd_darwin_arm64.tar.gz | tar xz
+sudo mv taskd /usr/local/bin/
+```
+
+**macOS (Intel):**
+```bash
+curl -sSL https://github.com/saddatahmad19/taskd/releases/latest/download/taskd_darwin_amd64.tar.gz | tar xz
+sudo mv taskd /usr/local/bin/
+```
+
+### From source
 
 ```bash
 git clone https://github.com/saddatahmad19/taskd.git
