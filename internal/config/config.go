@@ -58,6 +58,13 @@ type ThemeConfig struct {
 // Config is the root configuration object stored in
 // ~/.config/taskd/config.json.
 type Config struct {
+	// FullOnLaunch controls what happens when `taskd` is invoked with no
+	// subcommand arguments.
+	//
+	//   false (default) — print the normal help text.
+	//   true            — launch the full tabbed TUI (equivalent to `taskd full-ui`).
+	FullOnLaunch bool `json:"fullOnLaunch"`
+
 	Theme ThemeConfig `json:"theme"`
 }
 

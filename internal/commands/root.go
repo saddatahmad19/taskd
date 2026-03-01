@@ -77,6 +77,17 @@ func Execute() {
 		newVersionCmd(d),
 	)
 
+	// If fullOnLaunch is enabled, running `taskd` with no arguments launches
+	// the full tabbed TUI instead of printing help.
+	// We only attach RunE when the feature is on so that the default no-RunE
+	// cobra behaviour (print help, no hooks fired) is completely unchanged when
+	// the feature is off.
+	if cfg.FullOnLaunch {
+		rootCmd.RunE = func(cmd *cobra.Command, _ []string) error {
+			return runFullUI(cmd.Context(), d)
+		}
+	}
+
 	if cfgErr != nil {
 		fmt.Fprintln(os.Stderr, styles.Warning.Render("Warning: ")+cfgErr.Error())
 	}

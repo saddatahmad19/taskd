@@ -154,6 +154,7 @@ func (m *Model) handleFormDone(msg add.FormDoneMsg) (tea.Model, tea.Cmd) {
 		}
 		m.refreshModifyTasks()
 		m.modifyModel = m.newModifyModel()
+		m.resizeActiveView()
 		return m, m.modifyModel.Init()
 	}
 
@@ -173,6 +174,7 @@ func (m *Model) handleFormCancel() (tea.Model, tea.Cmd) {
 		m.modifyEditing = nil
 		m.modifyForm = nil
 		m.modifyModel = m.newModifyModel()
+		m.resizeActiveView()
 		return m, m.modifyModel.Init()
 	}
 	m.addForm = add.NewFormModel(m.ctx, m.tw, add.Defaults{})
@@ -199,6 +201,7 @@ func (m *Model) handleListDone(msg tasklist.ListViewDoneMsg) (tea.Model, tea.Cmd
 		}
 		m.refreshCompleteTasks()
 		m.completeModel = m.newCompleteModel()
+		m.resizeActiveView()
 		return m, m.completeModel.Init()
 	}
 
@@ -398,32 +401,38 @@ func (m *Model) View() string {
 	divider := lipgloss.NewStyle().Foreground(styles.Muted).
 		Render(strings.Repeat("─", max(m.width, 20)))
 
-	// Content area
+	// Content area — constrain height so tab bar stays visible (add form can overflow)
+	contentH := m.height - 5 // tab bar, divider, blank, status
+	if contentH < 2 {
+		contentH = 2
+	}
+	contentStyle := lipgloss.NewStyle().MaxHeight(contentH)
+
 	var content string
 	switch m.active {
 	case tabAdd:
 		if m.addForm != nil {
-			content = m.addForm.View()
+			content = contentStyle.Render(m.addForm.View())
 		}
 	case tabList:
 		if m.listModel != nil {
-			content = m.listModel.View()
+			content = contentStyle.Render(m.listModel.View())
 		} else {
-			content = styles.MutedText.Render("  Loading…")
+			content = contentStyle.Render(styles.MutedText.Render("  Loading…"))
 		}
 	case tabComplete:
 		if m.completeModel != nil {
-			content = m.completeModel.View()
+			content = contentStyle.Render(m.completeModel.View())
 		} else {
-			content = styles.MutedText.Render("  Loading…")
+			content = contentStyle.Render(styles.MutedText.Render("  Loading…"))
 		}
 	case tabModify:
 		if m.modifyForm != nil {
-			content = m.modifyForm.View()
+			content = contentStyle.Render(m.modifyForm.View())
 		} else if m.modifyModel != nil {
-			content = m.modifyModel.View()
+			content = contentStyle.Render(m.modifyModel.View())
 		} else {
-			content = styles.MutedText.Render("  Loading…")
+			content = contentStyle.Render(styles.MutedText.Render("  Loading…"))
 		}
 	}
 

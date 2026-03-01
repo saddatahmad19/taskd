@@ -1,0 +1,89 @@
+// taskd — example configuration file
+//
+// Location: ~/.config/taskd/config.json
+//           (respects $XDG_CONFIG_HOME if set)
+//
+// taskd creates this file automatically with all defaults on first run.
+// You only need to include the keys you want to change — any key that is
+// absent (or set to an empty string / null) falls back to the built-in default.
+//
+// NOTE: Standard JSON does not support comments. This file uses JSONC
+// (JSON with Comments) for documentation purposes only. Your actual
+// config.json must be valid JSON with no comment lines.
+
+{
+  // ── Behaviour ────────────────────────────────────────────────────────────────
+
+  // fullOnLaunch
+  //   Controls what happens when you run `taskd` with no subcommand.
+  //
+  //   false (default) — print the normal help/usage text.
+  //   true            — launch the full tabbed TUI immediately
+  //                     (equivalent to running `taskd full-ui`).
+  "fullOnLaunch": false,
+
+  // ── Theme ─────────────────────────────────────────────────────────────────────
+  //
+  // All color values are CSS hex strings: "#RRGGBB" or "#RGB".
+  // Set any field to "" or omit it entirely to keep the built-in default.
+
+  "theme": {
+
+    // accent
+    //   The primary accent color.
+    //   Used for: list/form titles, selected task description, tag text,
+    //             filter cursor, and the huh form's focused-field title.
+    //   Default:  #A78BFA  (soft violet)
+    "accent": "#A78BFA",
+
+    // accent_secondary
+    //   The secondary accent color.
+    //   Used for: project labels in the task list, and the huh form's
+    //             select-selector arrow.
+    //   Default:  #7C3AED  (indigo)
+    "accent_secondary": "#7C3AED",
+
+    // success
+    //   Color for positive / low-urgency indicators.
+    //   Used for: success messages after task creation, priority-low badges,
+    //             the filter-input prompt symbol, and the huh selected-option
+    //             highlight.
+    //   Default:  #10B981  (mint green)
+    "success": "#10B981",
+
+    // error
+    //   Color for errors and high-urgency indicators.
+    //   Used for: error messages printed to stderr, and priority-high badges
+    //             (including overdue due-date labels).
+    //   Default:  #F43F5E  (rose)
+    "error": "#F43F5E",
+
+    // warning
+    //   Color for warnings and medium-urgency indicators.
+    //   Used for: non-fatal warning messages (e.g. config parse errors),
+    //             and priority-medium badges.
+    //   Default:  #F59E0B  (amber)
+    "warning": "#F59E0B",
+
+    // muted
+    //   Color for secondary / dimmed text.
+    //   Used for: task ID numbers, metadata hints, the divider line,
+    //             status-bar labels, keyboard-shortcut hints, and the
+    //             huh form's blurred (inactive) field title.
+    //   Default:  #6B7280  (cool gray)
+    "muted": "#6B7280",
+
+    // surface
+    //   Background color for raised UI elements.
+    //   Used for: tag chip backgrounds, the list title bar, the
+    //             selected-row highlight, and the form header bar.
+    //   Default:  #1F2937  (dark gray-blue)
+    "surface": "#1F2937",
+
+    // text
+    //   The primary foreground text color.
+    //   Used for: task description text in the list, and filter-input text.
+    //   Default:  #F9FAFB  (near white)
+    "text": "#F9FAFB"
+  }
+}
