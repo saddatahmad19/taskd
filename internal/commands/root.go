@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/saddatahmad19/taskd/internal/config"
 	"github.com/saddatahmad19/taskd/internal/taskwarrior"
 	"github.com/saddatahmad19/taskd/internal/ui/styles"
 	"github.com/spf13/cobra"
@@ -17,9 +18,16 @@ type deps struct {
 var rootCmd *cobra.Command
 
 func Execute() {
+	// Load user config from ~/.config/taskd/config.json (created with defaults
+	// on first run) and apply theme colors before any UI renders.
+	cfg, cfgErr := config.Load()
+	styles.Init(cfg)
+	// cfgErr is non-fatal — we surface it as a soft warning after cobra runs.
+
 	// Shared dependency container — initialised lazily so --help never requires
 	// Taskwarrior to be installed.
 	d := &deps{}
+	_ = cfgErr // used below
 
 	// PersistentPreRunE wires up the taskwarrior client before any sub-command runs.
 	// Commands that don't need the client (e.g., help) bypass this via cobra's
@@ -65,8 +73,13 @@ func Execute() {
 		newListCmd(d),
 		newCompleteCmd(d),
 		newModifyCmd(d),
+		newFullUICmd(d),
 		newVersionCmd(d),
 	)
+
+	if cfgErr != nil {
+		fmt.Fprintln(os.Stderr, styles.Warning.Render("Warning: ")+cfgErr.Error())
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, styles.Error.Render("Error: ")+err.Error())

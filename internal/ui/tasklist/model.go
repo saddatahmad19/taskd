@@ -32,6 +32,11 @@ type Result struct {
 	Aborted bool
 }
 
+// ListViewDoneMsg is sent when the list exits in embedded mode (e.g. full-ui).
+// The parent receives this and can process the result without quitting.
+type ListViewDoneMsg struct {
+	Result Result
+}
 
 var (
 	keyQuit = key.NewBinding(
@@ -70,6 +75,10 @@ type Model struct {
 	width    int
 	height   int
 	quitting bool
+
+	// OnQuit, when non-nil, is called instead of tea.Quit when the list exits.
+	// Used when embedding the list in a parent (e.g. full-ui).
+	OnQuit func(Result) tea.Cmd
 }
 
 func New(tasks []taskwarrior.Task, mode Mode) Model {
@@ -143,6 +152,18 @@ func New(tasks []taskwarrior.Task, mode Mode) Model {
 
 func (m Model) Init() tea.Cmd { return nil }
 
+// SetSize updates the list dimensions (used when embedded in full-ui).
+func (m *Model) SetSize(width, height int) {
+	m.list.SetSize(width, height-2)
+}
+
+func (m Model) quitCmd() tea.Cmd {
+	if m.OnQuit != nil {
+		return m.OnQuit(m.result)
+	}
+	return tea.Quit
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -166,7 +187,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keyForceQuit):
 			m.result.Aborted = true
 			m.quitting = true
-			return m, tea.Quit
+			return m, m.quitCmd()
 
 		case key.Matches(msg, keyQuit):
 			// If a filter is applied, q clears the filter first.
@@ -176,7 +197,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.result.Aborted = true
 			m.quitting = true
-			return m, tea.Quit
+			return m, m.quitCmd()
 
 		case msg.String() == "esc":
 			if m.list.FilterState() == list.FilterApplied {
@@ -185,7 +206,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.result.Aborted = true
 			m.quitting = true
-			return m, tea.Quit
+			return m, m.quitCmd()
 
 		// ── Complete mode: toggle current item ───────────────────────────────
 		case key.Matches(msg, keyToggleSelect) && m.mode == ModeComplete:
@@ -221,7 +242,7 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 			t := it.Task
 			m.result.SelectedTask = &t
 			m.quitting = true
-			return m, tea.Quit
+			return m, m.quitCmd()
 		}
 
 	case ModeComplete:
@@ -239,7 +260,7 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		}
 		if len(m.result.CompletedUUIDs) > 0 {
 			m.quitting = true
-			return m, tea.Quit
+			return m, m.quitCmd()
 		}
 
 	case ModeList:
