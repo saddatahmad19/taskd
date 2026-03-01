@@ -311,14 +311,14 @@ func (m Model) renderHint() string {
 		}
 		if n > 0 {
 			line = styles.Success.Render(fmt.Sprintf("  %d selected  ", n)) +
-				styles.MutedText.Render("· space toggle  a select-all  enter confirm  q quit")
+				styles.MutedText.Render("· space toggle  a select-all  enter confirm")
 		} else {
-			line = styles.MutedText.Render("  space: toggle  a: select all  enter: confirm current  q: quit")
+			line = styles.MutedText.Render("  space: toggle  a: select all  enter: confirm current")
 		}
 	case ModeModify:
-		line = styles.MutedText.Render("  enter: open edit form  /: filter  q: quit")
+		line = styles.MutedText.Render("  enter: open edit form  /: filter")
 	default:
-		line = styles.MutedText.Render("  /: filter  q: quit")
+		line = styles.MutedText.Render("  /: filter")
 	}
 
 	// Append filter indicator if a filter is active.
