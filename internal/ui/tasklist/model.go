@@ -26,6 +26,14 @@ const (
 	ModePastDue
 )
 
+type confirmAction int
+
+const (
+	confirmNone     confirmAction = iota
+	confirmDelete                 // waiting for y/n after pressing d
+	confirmComplete               // waiting for y/n after pressing enter in ModeComplete
+)
+
 type Result struct {
 	// SelectedTask is the task the user chose in ModeModify.
 	SelectedTask *taskwarrior.Task
@@ -88,6 +96,13 @@ type Model struct {
 	width    int
 	height   int
 	quitting bool
+
+	// confirming holds the pending action awaiting y/n confirmation.
+	confirming confirmAction
+	// pendingDelete is the task staged for deletion while confirming.
+	pendingDelete *taskwarrior.Task
+	// pendingComplete holds UUIDs staged for completion while confirming.
+	pendingComplete []string
 
 	// OnQuit, when non-nil, is called instead of tea.Quit when the list exits.
 	// Used when embedding the list in a parent (e.g. full-ui).
@@ -201,6 +216,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// While a confirmation prompt is visible, only y/n/esc are meaningful.
+		if m.confirming != confirmNone {
+			switch msg.String() {
+			case "y", "Y":
+				return m.executeConfirmed()
+			case "n", "N", "esc", "q":
+				m.confirming = confirmNone
+				m.pendingDelete = nil
+				m.pendingComplete = nil
+			}
+			return m, nil
+		}
+
 		// While the filter input is active, pass all keys straight to the list.
 		if m.list.SettingFilter() {
 			var cmd tea.Cmd
@@ -247,12 +275,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleAll()
 			return m, nil
 
-		// ── Delete selected task (when OnDelete is set) ────────────────────────
+		// ── Delete selected task — ask for confirmation ────────────────────
 		case key.Matches(msg, keyDelete):
 			if m.OnDelete != nil {
 				if it, ok := m.list.SelectedItem().(Item); ok {
 					t := it.Task
-					return m, m.OnDelete(&t)
+					m.pendingDelete = &t
+					m.confirming = confirmDelete
 				}
 			}
 			return m, nil
@@ -269,6 +298,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// executeConfirmed carries out the pending action after the user pressed y.
+func (m Model) executeConfirmed() (tea.Model, tea.Cmd) {
+	switch m.confirming {
+	case confirmDelete:
+		task := m.pendingDelete
+		m.confirming = confirmNone
+		m.pendingDelete = nil
+		if task != nil && m.OnDelete != nil {
+			return m, m.OnDelete(task)
+		}
+	case confirmComplete:
+		uuids := m.pendingComplete
+		m.confirming = confirmNone
+		m.pendingComplete = nil
+		if len(uuids) > 0 {
+			m.result.CompletedUUIDs = uuids
+			m.quitting = true
+			return m, m.quitCmd()
+		}
+	}
+	return m, nil
+}
+
 func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.mode {
 
@@ -283,20 +335,21 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 
 	case ModeComplete:
 		// Collect everything that has been checked.
+		var uuids []string
 		for uuid, checked := range m.delegate.selected {
 			if checked {
-				m.result.CompletedUUIDs = append(m.result.CompletedUUIDs, uuid)
+				uuids = append(uuids, uuid)
 			}
 		}
 		// If nothing was checked, complete the currently highlighted item.
-		if len(m.result.CompletedUUIDs) == 0 {
+		if len(uuids) == 0 {
 			if it, ok := m.list.SelectedItem().(Item); ok {
-				m.result.CompletedUUIDs = []string{it.Task.UUID}
+				uuids = []string{it.Task.UUID}
 			}
 		}
-		if len(m.result.CompletedUUIDs) > 0 {
-			m.quitting = true
-			return m, m.quitCmd()
+		if len(uuids) > 0 {
+			m.pendingComplete = uuids
+			m.confirming = confirmComplete
 		}
 
 	case ModeList:
@@ -335,7 +388,43 @@ func (m Model) View() string {
 	)
 }
 
+func (m Model) renderConfirmPrompt() string {
+	var label string
+	switch m.confirming {
+	case confirmDelete:
+		desc := ""
+		if m.pendingDelete != nil {
+			desc = m.pendingDelete.Description
+		}
+		label = styles.Error.Render("  Delete") + " " +
+			lipgloss.NewStyle().Foreground(styles.Text).Bold(true).Render(fmt.Sprintf("%q", desc)) +
+			styles.MutedText.Render("?  ") +
+			styles.Warning.Render("[y]") +
+			styles.MutedText.Render(" yes  ") +
+			lipgloss.NewStyle().Foreground(styles.Mint).Render("[n]") +
+			styles.MutedText.Render(" no")
+	case confirmComplete:
+		n := len(m.pendingComplete)
+		noun := "task"
+		if n > 1 {
+			noun = "tasks"
+		}
+		label = styles.Success.Render(fmt.Sprintf("  Mark %d %s complete", n, noun)) +
+			styles.MutedText.Render("?  ") +
+			styles.Warning.Render("[y]") +
+			styles.MutedText.Render(" yes  ") +
+			lipgloss.NewStyle().Foreground(styles.Mint).Render("[n]") +
+			styles.MutedText.Render(" no")
+	}
+	return label
+}
+
 func (m Model) renderHint() string {
+	// Confirmation prompt takes over the hint bar.
+	if m.confirming != confirmNone {
+		return m.renderConfirmPrompt()
+	}
+
 	var line string
 	switch m.mode {
 	case ModeComplete:
